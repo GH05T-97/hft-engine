@@ -8,44 +8,22 @@ use hft_engine::{
 use warp::Filter;
 use prometheus::{gather, Encoder, TextEncoder};
 use hft_engine::metrics;
+use dotenv::dotenv;
 
-async fn metrics_handler() -> Result<impl warp::Reply, warp::Rejection> {
-    let encoder = TextEncoder::new();
-    let mut buffer = vec![];
-    encoder.encode(&gather(), &mut buffer).unwrap();
-
-    Ok(warp::reply::with_header(
-        String::from_utf8(buffer).unwrap(),
-        "content-type",
-        encoder.format_type(),
-    ))
-}
-
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    metrics::init_metrics_server().await;
-
-    let venue = BinanceVenue::new(
-        "your_api_key".to_string(),
-        "your_api_secret".to_string(),
-    );
-
-    venue.subscribe_quotes(vec!["BTCUSDT".to_string()]).await.unwrap();
-
-    // Keep the main thread alive
-    tokio::signal::ctrl_c().await.unwrap();
-
-
+#[tokio::main]async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut services = Services::new().await;
 
+    // Add venues
+    let venue = Arc::new(BinanceVenue::new(
+        std::env::var("BINANCE_API_KEY").unwrap_or_default(),
+        std::env::var("BINANCE_API_SECRET").unwrap_or_default(),
+    ));
 
-    let venue1 = Arc::new(ExampleVenue {
-        venue_name: "Venue1".to_string(),
-    });
-
+    // Initialize command & control
     let services_arc = Arc::new(RwLock::new(services));
     let command_control = CommandControl::new(Arc::clone(&services_arc)).await;
 
+    // Start trading
     command_control.start_trading().await?;
 
     Ok(())

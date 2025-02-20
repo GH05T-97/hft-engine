@@ -2,7 +2,9 @@ services:
   hft_engine:
     build: .
     ports:
-      - "8080:8080"  # API port
+      - "8080:8080"
+    env_file:
+      - .env
     volumes:
       - ./config:/etc/hft_engine/config
     environment:

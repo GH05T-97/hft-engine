@@ -17,11 +17,11 @@ pub struct BinanceVenue {
 
 #[derive(Debug, Deserialize)]
 struct BinanceBookTicker {
-    s: String,     // Symbol
-    b: String,     // Best bid price
-    b: String,     // Best bid qty
-    a: String,     // Best ask price
-    a: String,     // Best ask qty
+    symbol: String,
+    best_bid_price: String,
+    best_bid_quantity: String,
+    best_ask_price: String,
+    best_ask_quantity: String,
 }
 
 impl BinanceVenue {
@@ -33,49 +33,50 @@ impl BinanceVenue {
         }
     }
 
-    async fn connect_websocket(&self, symbols: Vec<String>) -> Result<(), Box<dyn std::error::Error>> {
-        let streams: Vec<String> = symbols
-            .iter()
-            .map(|s| format!("{}@bookTicker", s.to_lowercase()))
-            .collect();
+	async fn connect_websocket(&self, symbols: Vec<String>) -> Result<(), Box<dyn std::error::Error>> {
+		let streams: Vec<String> = symbols
+			.iter()
+			.map(|s| format!("{}@bookTicker", s.to_lowercase()))
+			.collect();
 
-        let ws_url = format!("{}/{}", self.ws_url, streams.join("/"));
-        let url = Url::parse(&ws_url)?;
+		let ws_url = format!("{}/{}", self.ws_url, streams.join("/"));
+		let url = Url::parse(&ws_url)?;
 
-        let (ws_stream, _) = connect_async(url).await?;
-        println!("WebSocket connected");
+		let (ws_stream, _) = connect_async(url).await?;
+		println!("WebSocket connected");
 
-        let (write, read) = ws_stream.split();
+		let (write, read) = ws_stream.split();
 
-        // Handle incoming messages
-        tokio::spawn(async move {
-            use futures_util::StreamExt;
-            let mut read = read;
+		// Handle incoming messages
+		tokio::spawn(async move {
+			use futures_util::StreamExt;
+			let mut read = read;
 
-            while let Some(message) = read.next().await {
-                match message {
-                    Ok(msg) => {
-                        if let Ok(ticker) = serde_json::from_str::<BinanceBookTicker>(&msg.to_string()) {
-                            let quote = Quote {
-                                symbol: ticker.s,
-                                bid: ticker.b.parse().unwrap_or(0.0),
-                                ask: ticker.a.parse().unwrap_or(0.0),
-                                venue: "BINANCE".to_string(),
-                                timestamp: std::time::SystemTime::now()
-                                    .duration_since(std::time::UNIX_EPOCH)
-                                    .unwrap()
-                                    .as_millis() as u64,
-                            };
-                            println!("Received quote: {:?}", quote);
-                        }
-                    }
-                    Err(e) => println!("Error receiving message: {}", e),
-                }
-            }
-        });
+			while let Some(message) = read.next().await {
+				match message {
+					Ok(msg) => {
+						if let Ok(ticker) = serde_json::from_str::<BinanceBookTicker>(&msg.to_string()) {
+							// Convert to our Quote type and process
+							let quote = Quote {
+								symbol: ticker.symbol,
+								bid: ticker.best_bid_price.parse().unwrap_or(0.0),
+								ask: ticker.best_ask_price.parse().unwrap_or(0.0),
+								venue: "BINANCE".to_string(),
+								timestamp: std::time::SystemTime::now()
+									.duration_since(std::time::UNIX_EPOCH)
+									.unwrap()
+									.as_millis() as u64,
+							};
+							println!("Received quote: {:?}", quote);
+						}
+					}
+					Err(e) => println!("Error receiving message: {}", e),
+				}
+			}
+		});
 
-        Ok(())
-    }
+		Ok(())
+	}
 }
 
 #[async_trait]
