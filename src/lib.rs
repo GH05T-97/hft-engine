@@ -6,3 +6,4 @@ pub mod strategy;
 pub mod execution;
 pub mod services;
 pub mod command;
+pub mod metrics;

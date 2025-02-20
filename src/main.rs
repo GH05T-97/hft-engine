@@ -7,6 +7,7 @@ use hft_engine::{
 };
 use warp::Filter;
 use prometheus::{gather, Encoder, TextEncoder};
+use hft_engine::metrics;
 
 async fn metrics_handler() -> Result<impl warp::Reply, warp::Rejection> {
     let encoder = TextEncoder::new();
@@ -22,12 +23,7 @@ async fn metrics_handler() -> Result<impl warp::Reply, warp::Rejection> {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let metrics_route = warp::path("metrics")
-        .and(warp::get())
-        .and_then(metrics_handler);
-
-    tokio::spawn(warp::serve(metrics_route)
-        .run(([0, 0, 0, 0], 9090)));
+    metrics::init_metrics_server().await;
 
 
     let mut services = Services::new().await;

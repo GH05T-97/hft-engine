@@ -23,23 +23,25 @@ lazy_static! {
     ).unwrap();
 }
 
-// Add this to execution/mod.rs
-use crate::metrics::{ORDER_LATENCY, ACTIVE_ORDERS};
-use std::time::Instant;
+async fn metrics_handler() -> Result<impl warp::Reply, warp::Rejection> {
+    let encoder = prometheus::TextEncoder::new();
+    let mut buffer = vec![];
+    encoder.encode(&prometheus::gather(), &mut buffer).unwrap();
 
-impl ExecutionEngine {
-    async fn execute_order(&self, order: Order) {
-        let start = Instant::now();
+    Ok(warp::reply::with_header(
+        String::from_utf8(buffer).unwrap(),
+        "content-type",
+        encoder.format_type(),
+    ))
+}
 
-        // Order execution logic here
+pub async fn init_metrics_server() {
+    let metrics_route = warp::path("metrics")
+        .and(warp::get())
+        .and_then(metrics_handler);
 
-        let duration = start.elapsed();
-        ORDER_LATENCY
-            .with_label_values(&[&order.venue, &order.order_type.to_string()])
-            .observe(duration.as_secs_f64());
+    println!("Starting metrics server on port 9090");
 
-        ACTIVE_ORDERS
-            .with_label_values(&[&order.venue])
-            .inc();
-    }
+    tokio::spawn(warp::serve(metrics_route)
+        .run(([0, 0, 0, 0], 9090)));
 }
