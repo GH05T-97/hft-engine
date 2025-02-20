@@ -1,6 +1,7 @@
 use lazy_static::lazy_static;
 use prometheus::{register_histogram_vec, register_counter_vec, register_gauge_vec};
-use prometheus::{HistogramVec, CounterVec, GaugeVec};
+use prometheus::{HistogramVec, CounterVec, GaugeVec, Encoder, TextEncoder};
+use warp::Filter;
 
 lazy_static! {
     pub static ref ORDER_LATENCY: HistogramVec = register_histogram_vec!(
@@ -24,7 +25,7 @@ lazy_static! {
 }
 
 async fn metrics_handler() -> Result<impl warp::Reply, warp::Rejection> {
-    let encoder = prometheus::TextEncoder::new();
+    let encoder = TextEncoder::new();
     let mut buffer = vec![];
     encoder.encode(&prometheus::gather(), &mut buffer).unwrap();
 

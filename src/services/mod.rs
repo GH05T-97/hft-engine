@@ -6,6 +6,7 @@ use crate::gateways::{quote::QuoteGateway, order::OrderGateway};
 use crate::book::{BookBuilder, OrderBook};
 use crate::strategy::Strategy;
 use crate::execution::ExecutionEngine;
+use crate::venues::BinanceVenue;
 
 pub struct Services {
     quote_gateway: QuoteGateway,

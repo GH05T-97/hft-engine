@@ -3,7 +3,10 @@ use crate::venues::VenueAdapter;
 use async_trait::async_trait;
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
-use tokio_tungstenite::{connect_async, tungstenite::Message};
+use tokio_tungstenite::{
+    connect_async,
+    tungstenite::http::Request,
+};
 use url::Url;
 use std::error::Error;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -33,26 +36,31 @@ struct BinanceBookTicker {
 }
 
 impl BinanceVenue {
-    pub fn new(api_key: String, api_secret: String) -> Self {
+	pub fn new(api_key: String, api_secret: String) -> Self {
         Self {
             ws_url: "wss://fstream.binance.com/ws".to_string(),
             rest_url: "https://fapi.binance.com/fapi".to_string(),
             api_key,
-            api_secret
+            api_secret,
         }
     }
 
-	async fn connect_websocket(&self, symbols: Vec<String>) -> Result<(), Box<dyn std::error::Error>> {
+    async fn connect_websocket(&self, symbols: Vec<String>) -> Result<(), Box<dyn std::error::Error>> {
         let streams: Vec<String> = symbols
             .iter()
             .map(|s| format!("{}@bookTicker", s.to_lowercase()))
             .collect();
 
         let ws_url = format!("{}/{}", self.ws_url, streams.join("/"));
-        println!("Connecting to: {}", ws_url);  // Debug print
+        println!("Connecting to: {}", ws_url);
 
-        let url = Url::parse(&ws_url)?;
-        let (ws_stream, _) = connect_async(url).await?;
+        // Create a request instead of using URL directly
+        let request = Request::builder()
+            .uri(ws_url)
+            .header("User-Agent", "Mozilla/5.0")
+            .body(())?;
+
+        let (ws_stream, _) = connect_async(request).await?;
         println!("WebSocket connected successfully");
 
         let (write, read) = ws_stream.split();
@@ -64,7 +72,7 @@ impl BinanceVenue {
             while let Some(message) = read.next().await {
                 match message {
                     Ok(msg) => {
-                        println!("Raw message: {}", msg.to_string());  // Debug print
+                        println!("Raw message: {}", msg.to_string());
                         if let Ok(ticker) = serde_json::from_str::<BinanceBookTicker>(&msg.to_string()) {
                             let quote = Quote {
                                 symbol: ticker.symbol,
@@ -77,8 +85,6 @@ impl BinanceVenue {
                                     .as_millis() as u64,
                             };
                             println!("Processed quote: {:?}", quote);
-                        } else {
-                            println!("Failed to parse message");
                         }
                     }
                     Err(e) => println!("Error receiving message: {}", e),
@@ -92,14 +98,12 @@ impl BinanceVenue {
 
 #[async_trait]
 impl VenueAdapter for BinanceVenue {
-    async fn subscribe_quotes(&self, symbols: Vec<String>) -> Result<(), Box<dyn std::error::Error>> {
+    async fn subscribe_quotes(&self, symbols: Vec<String>) -> Result<(), Box<dyn Error>> {
         self.connect_websocket(symbols).await
     }
 
-    async fn submit_order(&self, order: Order) -> Result<String, Box<dyn std::error::Error>> {
-        // Implement order submission logic
-        // For now, just log the order
-        println!("Submitting order to Binance: {:?}", order);
+    async fn submit_order(&self, order: Order) -> Result<String, Box<dyn Error>> {
+        // Implement order submission
         Ok("mock_order_id".to_string())
     }
 }

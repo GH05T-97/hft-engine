@@ -3,7 +3,7 @@ use tokio::sync::RwLock;
 use hft_engine::{
     services::Services,
     command::CommandControl,
-    venues::example::ExampleVenue,
+    venues::binance::BinanceVenue,
 };
 use warp::Filter;
 use prometheus::{gather, Encoder, TextEncoder};

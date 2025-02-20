@@ -3,6 +3,14 @@ name = "hft-engine"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "hft_engine"
+path = "src/main.rs"
+
+[[example]]
+name = "futures_connect_test"
+path = "examples/futures_connect_test.rs"
+
 [dependencies]
 tokio = { version = "1.0", features = ["full"] }
 tokio-tungstenite = { version = "0.26.2", features = ["native-tls"] }
@@ -15,3 +23,4 @@ prometheus = "0.13"
 lazy_static = "1.4"
 warp = "0.3"
 tracing = "0.1"
+dotenv = "0.15"

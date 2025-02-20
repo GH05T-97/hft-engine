@@ -31,3 +31,12 @@ pub enum OrderType {
     Market,
     Limit,
 }
+
+impl fmt::Display for OrderType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            OrderType::Market => write!(f, "market"),
+            OrderType::Limit => write!(f, "limit"),
+        }
+    }
+}

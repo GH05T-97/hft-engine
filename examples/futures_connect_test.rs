@@ -1,14 +1,13 @@
-use hft_engine::venues::BinanceVenue;
+use hft_engine::venues::{BinanceVenue, VenueAdapter};  // Add VenueAdapter here
+use std::error::Error;
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // We don't need API keys for public market data
+async fn main() -> Result<(), Box<dyn Error>> {
     let venue = BinanceVenue::new(
         String::new(),  // empty api key
         String::new(),  // empty secret
     );
 
-    // Subscribe to BTCUSDT market data
     venue.subscribe_quotes(vec!["btcusdt".to_string()]).await?;
 
     println!("Connected and listening for quotes...");
