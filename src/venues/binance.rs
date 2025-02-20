@@ -13,70 +13,81 @@ pub struct BinanceVenue {
     ws_url: String,
     api_key: String,
     api_secret: String,
+    rest_url: String,
 }
 
 #[derive(Debug, Deserialize)]
 struct BinanceBookTicker {
+    #[serde(rename = "s")]
     symbol: String,
+    #[serde(rename = "b")]
     best_bid_price: String,
+    #[serde(rename = "B")]
     best_bid_quantity: String,
+    #[serde(rename = "a")]
     best_ask_price: String,
+    #[serde(rename = "A")]
     best_ask_quantity: String,
+    #[serde(rename = "T")]
+    time: u64,
 }
 
 impl BinanceVenue {
     pub fn new(api_key: String, api_secret: String) -> Self {
         Self {
-            ws_url: "wss://stream.binance.com:9443/ws".to_string(),
+            ws_url: "wss://fstream.binance.com/ws".to_string(),
+            rest_url: "https://fapi.binance.com/fapi".to_string(),
             api_key,
-            api_secret,
+            api_secret
         }
     }
 
 	async fn connect_websocket(&self, symbols: Vec<String>) -> Result<(), Box<dyn std::error::Error>> {
-		let streams: Vec<String> = symbols
-			.iter()
-			.map(|s| format!("{}@bookTicker", s.to_lowercase()))
-			.collect();
+        let streams: Vec<String> = symbols
+            .iter()
+            .map(|s| format!("{}@bookTicker", s.to_lowercase()))
+            .collect();
 
-		let ws_url = format!("{}/{}", self.ws_url, streams.join("/"));
-		let url = Url::parse(&ws_url)?;
+        let ws_url = format!("{}/{}", self.ws_url, streams.join("/"));
+        println!("Connecting to: {}", ws_url);  // Debug print
 
-		let (ws_stream, _) = connect_async(url).await?;
-		println!("WebSocket connected");
+        let url = Url::parse(&ws_url)?;
+        let (ws_stream, _) = connect_async(url).await?;
+        println!("WebSocket connected successfully");
 
-		let (write, read) = ws_stream.split();
+        let (write, read) = ws_stream.split();
 
-		// Handle incoming messages
-		tokio::spawn(async move {
-			use futures_util::StreamExt;
-			let mut read = read;
+        tokio::spawn(async move {
+            use futures_util::StreamExt;
+            let mut read = read;
 
-			while let Some(message) = read.next().await {
-				match message {
-					Ok(msg) => {
-						if let Ok(ticker) = serde_json::from_str::<BinanceBookTicker>(&msg.to_string()) {
-							// Convert to our Quote type and process
-							let quote = Quote {
-								symbol: ticker.symbol,
-								bid: ticker.best_bid_price.parse().unwrap_or(0.0),
-								ask: ticker.best_ask_price.parse().unwrap_or(0.0),
-								venue: "BINANCE".to_string(),
-								timestamp: std::time::SystemTime::now()
-									.duration_since(std::time::UNIX_EPOCH)
-									.unwrap()
-									.as_millis() as u64,
-							};
-							println!("Received quote: {:?}", quote);
-						}
-					}
-					Err(e) => println!("Error receiving message: {}", e),
-				}
-			}
-		});
+            while let Some(message) = read.next().await {
+                match message {
+                    Ok(msg) => {
+                        println!("Raw message: {}", msg.to_string());  // Debug print
+                        if let Ok(ticker) = serde_json::from_str::<BinanceBookTicker>(&msg.to_string()) {
+                            let quote = Quote {
+                                symbol: ticker.symbol,
+                                bid: ticker.best_bid_price.parse().unwrap_or(0.0),
+                                ask: ticker.best_ask_price.parse().unwrap_or(0.0),
+                                venue: "BINANCE_FUTURES".to_string(),
+                                timestamp: std::time::SystemTime::now()
+                                    .duration_since(std::time::UNIX_EPOCH)
+                                    .unwrap()
+                                    .as_millis() as u64,
+                            };
+                            println!("Processed quote: {:?}", quote);
+                        } else {
+                            println!("Failed to parse message");
+                        }
+                    }
+                    Err(e) => println!("Error receiving message: {}", e),
+                }
+            }
+        });
 
-		Ok(())
-	}
+        Ok(())
+    }
 }
 
 #[async_trait]
