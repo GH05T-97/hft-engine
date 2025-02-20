@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   hft_engine:
     build: .
@@ -15,6 +13,7 @@ services:
 
   prometheus:
     image: prom/prometheus:latest
+    container_name: prometheus
     ports:
       - "9090:9090"
     volumes:
@@ -30,6 +29,7 @@ services:
 
   grafana:
     image: grafana/grafana:latest
+    container_name: grafana  # Add if not present
     ports:
       - "3000:3000"
     volumes:

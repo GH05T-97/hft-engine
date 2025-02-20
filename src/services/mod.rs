@@ -21,6 +21,11 @@ impl Services {
         let (order_tx, order_rx) = mpsc::channel(1000);
         let books = Arc::new(RwLock::new(HashMap::new()));
 
+        let binance = Arc::new(BinanceVenue::new(
+            std::env::var("BINANCE_API_KEY").unwrap_or_default(),
+            std::env::var("BINANCE_API_SECRET").unwrap_or_default(),
+        ));
+
         Self {
             quote_gateway: QuoteGateway {
                 venues: Vec::new(),

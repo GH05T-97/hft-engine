@@ -25,6 +25,16 @@ async fn metrics_handler() -> Result<impl warp::Reply, warp::Rejection> {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     metrics::init_metrics_server().await;
 
+    let venue = BinanceVenue::new(
+        "your_api_key".to_string(),
+        "your_api_secret".to_string(),
+    );
+
+    venue.subscribe_quotes(vec!["BTCUSDT".to_string()]).await.unwrap();
+
+    // Keep the main thread alive
+    tokio::signal::ctrl_c().await.unwrap();
+
 
     let mut services = Services::new().await;
 
