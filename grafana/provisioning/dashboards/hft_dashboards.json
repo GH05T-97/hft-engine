@@ -1,0 +1,60 @@
+{
+	"annotations": {
+	  "list": []
+	},
+	"editable": true,
+	"gnetId": null,
+	"graphTooltip": 0,
+	"id": 1,
+	"links": [],
+	"panels": [
+	  {
+		"title": "Order Book Updates per Second",
+		"type": "graph",
+		"datasource": "Prometheus",
+		"targets": [
+		  {
+			"expr": "rate(hft_orderbook_updates_total[1m])",
+			"legendFormat": "{{symbol}}"
+		  }
+		]
+	  },
+	  {
+		"title": "Order Latency",
+		"type": "graph",
+		"datasource": "Prometheus",
+		"targets": [
+		  {
+			"expr": "rate(hft_order_latency_seconds_sum[1m]) / rate(hft_order_latency_seconds_count[1m])",
+			"legendFormat": "{{venue}}"
+		  }
+		]
+	  },
+	  {
+		"title": "Active Orders",
+		"type": "gauge",
+		"datasource": "Prometheus",
+		"targets": [
+		  {
+			"expr": "hft_active_orders"
+		  }
+		]
+	  }
+	],
+	"refresh": "5s",
+	"schemaVersion": 16,
+	"style": "dark",
+	"tags": [],
+	"templating": {
+	  "list": []
+	},
+	"time": {
+	  "from": "now-1h",
+	  "to": "now"
+	},
+	"timepicker": {},
+	"timezone": "",
+	"title": "HFT Dashboard",
+	"uid": "hft",
+	"version": 1
+  }

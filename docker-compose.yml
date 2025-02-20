@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  hft_engine:
+    build: .
+    ports:
+      - "8080:8080"  # API port
+    volumes:
+      - ./config:/etc/hft_engine/config
+    environment:
+      - RUST_LOG=info
+      - METRICS_PORT=9090
+    networks:
+      - hft_network
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+    networks:
+      - hft_network
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - grafana_data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=secret
+    depends_on:
+      - prometheus
+    networks:
+      - hft_network
+
+volumes:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  hft_network:
+    driver: bridge
+
+
