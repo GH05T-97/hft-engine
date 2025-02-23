@@ -12,7 +12,7 @@ services:
       - METRICS_PORT=9090
     networks:
       - hft_network
-    command: futures_connect_test
+    command: hft_engine
 
   prometheus:
     image: prom/prometheus:latest
