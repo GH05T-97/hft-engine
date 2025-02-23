@@ -12,7 +12,6 @@ use dotenv::dotenv;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Initialize everything
     let mut services = Services::new().await;
 
     // Add venues
@@ -28,9 +27,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Start trading
     command_control.start_trading().await?;
 
-    println!("HFT Engine started successfully");
-
-    // Keep the main thread running
     tokio::signal::ctrl_c().await?;  // Wait for Ctrl+C signal
 
     println!("Shutting down HFT Engine");
