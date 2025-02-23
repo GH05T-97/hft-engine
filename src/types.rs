@@ -6,6 +6,8 @@ pub struct Quote {
     pub symbol: String,
     pub bid: f64,
     pub ask: f64,
+    pub bid_size: f64,
+    pub ask_size: f64,
     pub venue: String,
     pub timestamp: u64,
 }

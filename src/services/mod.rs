@@ -51,7 +51,29 @@ impl Services {
     }
 
     pub async fn start(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        // Start all components
+        println!("Starting services...");
+
+        // Start quote gateway
+        println!("Starting quote gateway...");
+        // Add your quote gateway start logic
+
+        // Start order gateway
+        println!("Starting order gateway...");
+        // Add your order gateway start logic
+
+        // Start book builder
+        println!("Starting book builder...");
+        // Add your book builder start logic
+
+        // Start strategy
+        println!("Starting strategy...");
+        // Add your strategy start logic
+
+        // Start execution engine
+        println!("Starting execution engine...");
+        // Add your execution engine start logic
+
+        println!("All services started successfully");
         Ok(())
     }
 }

@@ -78,6 +78,8 @@ impl BinanceVenue {
                                 symbol: ticker.symbol,
                                 bid: ticker.best_bid_price.parse().unwrap_or(0.0),
                                 ask: ticker.best_ask_price.parse().unwrap_or(0.0),
+								bid_size: ticker.best_bid_quantity.parse().unwrap_or(0.0),
+								ask_size: ticker.best_ask_quantity.parse().unwrap_or(0.0),
                                 venue: "BINANCE_FUTURES".to_string(),
                                 timestamp: std::time::SystemTime::now()
                                     .duration_since(std::time::UNIX_EPOCH)
@@ -102,10 +104,10 @@ impl VenueAdapter for BinanceVenue {
         self.connect_websocket(symbols).await
     }
 
-    async fn submit_order(&self, order: Order) -> Result<String, Box<dyn Error>> {
-        // Implement order submission
-        Ok("mock_order_id".to_string())
-    }
+	async fn submit_order(&self, order: Order) -> Result<String, Box<dyn Error>> {
+		// TODO: Implement actual order submission
+		Ok("mock_order_id".to_string())
+	}
 }
 
 // Add tests
