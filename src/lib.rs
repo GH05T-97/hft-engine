@@ -7,3 +7,4 @@ pub mod execution;
 pub mod services;
 pub mod command;
 pub mod metrics;
+pub mod error;
