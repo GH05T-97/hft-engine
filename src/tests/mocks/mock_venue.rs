@@ -164,6 +164,10 @@ impl Clone for MockVenueConfig {
 
 #[async_trait]
 impl VenueAdapter for MockVenue {
+    async fn name(&self) -> String {
+        self.name.clone()
+    }
+
     async fn subscribe_quotes(&self, symbols: Vec<String>) -> Result<(), HftError> {
         if symbols.is_empty() {
             return Err(VenueError::SubscriptionFailed("Empty symbol list".to_string()).into());
@@ -258,7 +262,7 @@ mod tests {
         let venue = MockVenue::new("MOCK", MockVenueConfig::default());
 
         // Configure a specific error response
-        let error = VenueError::OrderRejected("Insufficient funds".to_string()).into();
+        let error = VenueError::OrderSubmissionFailed("Insufficient funds".to_string()).into();
         venue.set_order_response("BTCUSDT", OrderSide::Buy, Err(error)).await;
 
         let order = Order {

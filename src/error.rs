@@ -62,6 +62,18 @@ pub enum GatewayError {
 
     #[error("Channel capacity exceeded")]
     ChannelCapacityExceeded,
+
+    #[error("Venue not found: {0}")]
+    VenueNotFound(String),
+
+    #[error("Failed to send data through channel: {0}")]
+    ChannelSendFailed(String),
+
+    #[error("Subscription failed: {0}")]
+    SubscriptionFailed(String),
+
+    #[error("Gateway not running")]
+    NotRunning,
 }
 
 /// Errors related to execution engine

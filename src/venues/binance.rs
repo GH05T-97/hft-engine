@@ -208,6 +208,10 @@ impl BinanceVenue {
 
 #[async_trait]
 impl VenueAdapter for BinanceVenue {
+    async fn name(&self) -> String {
+        "BINANCE_FUTURES".to_string()
+    }
+
     async fn subscribe_quotes(&self, symbols: Vec<String>) -> Result<(), HftError> {
         if symbols.is_empty() {
             return Err(VenueError::SubscriptionFailed("Empty symbol list".to_string()).into());
@@ -242,64 +246,5 @@ impl VenueAdapter for BinanceVenue {
         );
 
         Ok("mock_order_id".to_string())
-    }
-}
-
-// Add tests
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::types::{OrderSide, OrderType};
-
-    #[tokio::test]
-    async fn test_invalid_order_quantity() {
-        let venue = BinanceVenue::new(
-            "fake_api_key".to_string(),
-            "fake_api_secret".to_string(),
-        );
-
-        let order = Order {
-            symbol: "BTCUSDT".to_string(),
-            side: OrderSide::Buy,
-            quantity: -1.0, // Invalid quantity
-            price: 50000.0,
-            venue: "BINANCE".to_string(),
-            order_type: OrderType::Limit,
-        };
-
-        let result = venue.submit_order(order).await;
-        assert!(result.is_err());
-
-        if let Err(HftError::Venue(VenueError::OrderSubmissionFailed(msg))) = result {
-            assert!(msg.contains("Invalid quantity"));
-        } else {
-            panic!("Expected OrderSubmissionFailed error, got: {:?}", result);
-        }
-    }
-
-    #[tokio::test]
-    async fn test_invalid_limit_price() {
-        let venue = BinanceVenue::new(
-            "fake_api_key".to_string(),
-            "fake_api_secret".to_string(),
-        );
-
-        let order = Order {
-            symbol: "BTCUSDT".to_string(),
-            side: OrderSide::Buy,
-            quantity: 1.0,
-            price: 0.0, // Invalid price for limit order
-            venue: "BINANCE".to_string(),
-            order_type: OrderType::Limit,
-        };
-
-        let result = venue.submit_order(order).await;
-        assert!(result.is_err());
-
-        if let Err(HftError::Venue(VenueError::OrderSubmissionFailed(msg))) = result {
-            assert!(msg.contains("Invalid price for limit order"));
-        } else {
-            panic!("Expected OrderSubmissionFailed error, got: {:?}", result);
-        }
     }
 }

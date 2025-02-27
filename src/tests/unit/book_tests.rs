@@ -1,4 +1,3 @@
-// tests/unit/book_tests.rs
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tokio::task;
