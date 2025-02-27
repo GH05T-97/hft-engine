@@ -8,6 +8,12 @@ COPY . .
 # Build the main application
 RUN cargo build --release
 
+# Run the tests
+RUN cargo test --release
+
+# Build the final binary
+RUN cargo build --release
+
 FROM ubuntu:latest
 
 # Install necessary runtime dependencies
