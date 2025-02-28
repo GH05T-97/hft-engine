@@ -44,7 +44,7 @@ impl QuoteGateway {
                         error!(
                             venue = %venue_name,
                             symbols = ?symbols,
-                            error = %e,
+                            error = ?e,
                             "Failed to subscribe new venue to existing symbols"
                         );
                     }
@@ -114,7 +114,7 @@ impl QuoteGateway {
                     subscriptions.insert(venue_name, symbols.clone());
                 },
                 Err(e) => {
-                    error!(venue = %venue_name, error = %e, "Failed to subscribe to symbols");
+                    error!(venue = %venue_name, error = ?e, "Failed to subscribe to symbols");
                     errors.push((venue_name, e));
                 }
             }
@@ -123,7 +123,7 @@ impl QuoteGateway {
         // If all venues failed, return an error
         if errors.len() == venues.len() {
             let error_msg = errors.into_iter()
-                .map(|(venue, err)| format!("{}: {}", venue, err))
+                .map(|(venue, err)| format!("{}: {:?}", venue, err))
                 .collect::<Vec<_>>()
                 .join(", ");
 
@@ -173,11 +173,4 @@ impl QuoteGateway {
     pub async fn get_subscriptions(&self) -> HashMap<String, Vec<String>> {
         self.subscriptions.read().await.clone()
     }
-}
-
-// Add this trait to the VenueAdapter to get the venue name
-#[async_trait]
-pub trait VenueInfo {
-    /// Get the venue name
-    async fn name(&self) -> String;
 }

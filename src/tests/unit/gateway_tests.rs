@@ -2,10 +2,10 @@ use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio::time::Duration;
 
-use hft_engine::gateways::quote::QuoteGateway;
-use hft_engine::types::Quote;
-use hft_engine::error::{HftError, GatewayError};
-use crate::mocks::mock_venue::{MockVenue, MockVenueConfig};
+use crate::gateways::quote::QuoteGateway;
+use crate::types::Quote;
+use crate::error::{HftError, GatewayError};
+use crate::tests::mocks::mock_venue::{MockVenue, MockVenueConfig};
 
 #[tokio::test]
 async fn test_quote_gateway_add_venue() {

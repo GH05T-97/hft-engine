@@ -1,10 +1,10 @@
 use tokio::sync::mpsc;
 use std::time::Duration;
 
-use hft_engine::venues::binance::BinanceVenue;
-use hft_engine::venues::VenueAdapter;
-use hft_engine::types::{Order, OrderSide, OrderType, Quote};
-use hft_engine::error::{HftError, VenueError};
+use crate::venues::binance::BinanceVenue;
+use crate::venues::VenueAdapter;
+use crate::types::{Order, OrderSide, OrderType, Quote};
+use crate::error::{HftError, VenueError};
 
 #[tokio::test]
 async fn test_binance_venue_name() {
@@ -91,7 +91,7 @@ async fn test_market_order_zero_price() {
 
 #[tokio::test]
 async fn test_venue_with_quote_sender() {
-    let (tx, mut rx) = mpsc::channel::<Quote>(100);
+    let (tx, _rx) = mpsc::channel::<Quote>(100);
 
     let venue = BinanceVenue::new(
         "fake_api_key".to_string(),
@@ -117,3 +117,12 @@ async fn test_venue_with_quote_sender() {
     let result = venue.submit_order(order).await;
     assert!(result.is_ok());
 }
+
+// In a real test suite, you would add tests for:
+// - WebSocket connection and reconnection
+// - Quote parsing from WebSocket messages
+// - Order submission via REST API
+// - Error handling for network issues
+//
+// These would require mocking the WebSocket and HTTP responses,
+// which is beyond the scope of this implementation.

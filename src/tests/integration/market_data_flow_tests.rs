@@ -3,10 +3,10 @@ use std::collections::HashMap;
 use tokio::sync::{mpsc, RwLock};
 use tokio::time::Duration;
 
-use hft_engine::book::{OrderBook, BookBuilder};
-use hft_engine::types::Quote;
-use hft_engine::gateways::quote::QuoteGateway;
-use crate::mocks::mock_venue::{MockVenue, MockVenueConfig};
+use crate::book::{OrderBook, BookBuilder};
+use crate::types::Quote;
+use crate::gateways::quote::QuoteGateway;
+use crate::tests::mocks::mock_venue::{MockVenue, MockVenueConfig};
 
 /// This test verifies the end-to-end flow of market data from venues through
 /// the quote gateway to the order book builder.

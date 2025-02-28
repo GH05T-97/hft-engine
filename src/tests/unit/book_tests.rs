@@ -3,8 +3,8 @@ use tokio::sync::RwLock;
 use tokio::task;
 use std::collections::HashMap;
 
-use hft_engine::book::OrderBook;
-use hft_engine::types::Quote;
+use crate::book::OrderBook;
+use crate::types::Quote;
 
 #[tokio::test]
 async fn test_order_book_creation() {

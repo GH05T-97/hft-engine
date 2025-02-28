@@ -71,3 +71,4 @@ impl OrderBook {
             .map(|(&p, &s)| ((p as f64) / PRICE_MULTIPLIER, s))
     }
 }
+

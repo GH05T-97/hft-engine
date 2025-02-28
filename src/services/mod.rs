@@ -28,12 +28,9 @@ impl Services {
         ));
 
         Self {
-            quote_gateway: QuoteGateway {
-                venues: Vec::new(),
-                quote_tx,
-            },
+            quote_gateway: QuoteGateway::new(quote_tx),
             order_gateway: OrderGateway {
-                venues: Vec::new(),
+                venues: vec![],
                 order_rx,
             },
             book_builder: BookBuilder {

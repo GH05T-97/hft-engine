@@ -2,10 +2,11 @@ use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio::time::Duration;
 
-use hft_engine::types::{Order, OrderSide, OrderType};
-use hft_engine::gateways::order::OrderGateway;
-use hft_engine::execution::ExecutionEngine;
-use crate::mocks::mock_venue::{MockVenue, MockVenueConfig};
+use crate::types::{Order, OrderSide, OrderType};
+use crate::gateways::order::OrderGateway;
+use crate::execution::ExecutionEngine;
+use crate::tests::mocks::mock_venue::{MockVenue, MockVenueConfig};
+use crate::error::{HftError, VenueError};
 
 /// This test verifies the end-to-end flow of orders from strategy through
 /// execution engine and order gateway to venues.
@@ -118,14 +119,10 @@ async fn test_order_routing() {
 /// This test verifies that order submissions handle errors properly.
 #[tokio::test]
 async fn test_order_error_handling() {
-    // Create order channel
-    let (order_tx, order_rx) = mpsc::channel(100);
-
     // Create mock venue with custom error responses
     let venue = Arc::new(MockVenue::new("MOCK", MockVenueConfig::default()));
 
     // Configure a specific error response for invalid orders
-    use hft_engine::error::{HftError, VenueError};
     let error = VenueError::OrderSubmissionFailed("Insufficient funds".to_string()).into();
     venue.set_order_response("BTCUSDT", OrderSide::Buy, Err(error)).await;
 
