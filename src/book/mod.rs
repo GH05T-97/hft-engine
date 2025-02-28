@@ -72,7 +72,24 @@ impl OrderBook {
     }
 }
 
-#[tokio::test]
+#[cfg(test)]
+mod test {
+    use super::*;
+    use std::sync::Arc;
+    use tokio::sync::RwLock;
+    use tokio::task;
+    use std::collections::HashMap;
+    use crate::types::Quote;
+
+    #[tokio::test]
+    async fn test_order_book_creation() {
+        let book = OrderBook::new("BTCUSDT".to_string());
+        assert_eq!(book.symbol, "BTCUSDT");
+        assert!(book.bids.is_empty());
+        assert!(book.asks.is_empty());
+    }
+
+    #[tokio::test]
 async fn test_order_book_creation() {
     let book = OrderBook::new("BTCUSDT".to_string());
     assert_eq!(book.symbol, "BTCUSDT");
@@ -403,4 +420,5 @@ async fn test_extreme_price_values() {
 
     assert_eq!(bid_price, 1_000_000.0);
     assert_eq!(ask_price, 1_000_001.0);
+}
 }

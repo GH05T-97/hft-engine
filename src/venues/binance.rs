@@ -1,5 +1,5 @@
 use crate::error::{HftError, VenueError, ErrorExt};
-use crate::types::{Order, Quote};
+use crate::types::{Order, Quote, OrderSide, OrderType};
 use crate::venues::VenueAdapter;
 use async_trait::async_trait;
 use futures_util::StreamExt;
@@ -8,7 +8,6 @@ use tokio_tungstenite::{
     connect_async,
     tungstenite::http::Request,
 };
-use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::sync::mpsc;
 use tracing::{info, warn, error, debug, trace};
 
@@ -82,47 +81,45 @@ impl BinanceVenue {
         Ok(())
     }
 
-async fn ws_connect_with_retry(
-    &self,
-    request: Request<()>,
-    quote_tx: mpsc::Sender<Quote>,
-    max_attempts: usize
-) -> Result<(), HftError> {
-    let mut attempts = 0;
+    async fn ws_connect_with_retry(
+        &self,
+        request: Request<()>,
+        quote_tx: mpsc::Sender<Quote>,
+        max_attempts: usize
+    ) -> Result<(), HftError> {
+        let mut attempts = 0;
 
-    loop {
-        attempts += 1;
-        // Fixed: Don't try to use map_err on the request directly
-        match connect_async(request.clone())
-            .await
-            .context("WebSocket connection failed")
-        {
-            Ok((ws_stream, _)) => {
-                info!("WebSocket connected successfully");
-                let (write, read) = ws_stream.split();
+        loop {
+            attempts += 1;
+            // Fixed: Use clone() and handle the connect_async result separately
+            let request_copy = request.clone();
+            match connect_async(request_copy).await {
+                Ok((ws_stream, _)) => {
+                    info!("WebSocket connected successfully");
+                    let (_write, read) = ws_stream.split();
 
-                self.process_websocket_messages(read, quote_tx.clone()).await;
-                return Ok(());
-            }
-            Err(e) => {
-                error!(error = ?e.error, context = %e.context, "WebSocket connection error");
-                if attempts >= max_attempts {
-                    return Err(VenueError::ConnectionFailed(
-                        format!("Failed after {} attempts: {}", attempts, e.error)
-                    ).into());
+                    self.process_websocket_messages(read, quote_tx.clone()).await;
+                    return Ok(());
                 }
+                Err(e) => {
+                    error!(error = ?e, "WebSocket connection error");
+                    if attempts >= max_attempts {
+                        return Err(VenueError::ConnectionFailed(
+                            format!("Failed after {} attempts: {}", attempts, e)
+                        ).into());
+                    }
 
-                warn!(
-                    attempt = attempts,
-                    max_attempts = max_attempts,
-                    delay_ms = RECONNECT_DELAY_MS,
-                    "Retrying connection"
-                );
-                tokio::time::sleep(tokio::time::Duration::from_millis(RECONNECT_DELAY_MS)).await;
+                    warn!(
+                        attempt = attempts,
+                        max_attempts = max_attempts,
+                        delay_ms = RECONNECT_DELAY_MS,
+                        "Retrying connection"
+                    );
+                    tokio::time::sleep(tokio::time::Duration::from_millis(RECONNECT_DELAY_MS)).await;
+                }
             }
         }
     }
-}
 
     async fn process_websocket_messages(
         &self,

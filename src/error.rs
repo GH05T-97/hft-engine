@@ -2,7 +2,7 @@ use std::fmt;
 use thiserror::Error;
 
 /// Core error types for the HFT engine
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone)]
 pub enum HftError {
     #[error("Venue error: {0}")]
     Venue(#[from] VenueError),
@@ -20,14 +20,21 @@ pub enum HftError {
     Config(String),
 
     #[error("IO error: {0}")]
-    Io(#[from] std::io::Error),
+    Io(String),
 
     #[error("Unknown error: {0}")]
     Unknown(String),
 }
 
+// Special implementation for std::io::Error since it's not cloneable
+impl From<std::io::Error> for HftError {
+    fn from(e: std::io::Error) -> Self {
+        HftError::Io(e.to_string())
+    }
+}
+
 /// Errors related to venue connections and operations
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone)]
 pub enum VenueError {
     #[error("Connection failed: {0}")]
     ConnectionFailed(String),
@@ -52,7 +59,7 @@ pub enum VenueError {
 }
 
 /// Errors related to gateway operations
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone)]
 pub enum GatewayError {
     #[error("No venues configured")]
     NoVenuesConfigured,
@@ -77,7 +84,7 @@ pub enum GatewayError {
 }
 
 /// Errors related to execution engine
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone)]
 pub enum ExecutionError {
     #[error("Invalid order: {0}")]
     InvalidOrder(String),
@@ -90,7 +97,7 @@ pub enum ExecutionError {
 }
 
 /// Errors related to order book operations
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone)]
 pub enum BookError {
     #[error("Invalid price: {0}")]
     InvalidPrice(f64),

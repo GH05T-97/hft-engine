@@ -8,5 +8,6 @@ pub mod services;
 pub mod command;
 pub mod metrics;
 pub mod error;
+
 #[cfg(test)]
 pub mod mocks;

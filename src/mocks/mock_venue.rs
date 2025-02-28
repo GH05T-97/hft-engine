@@ -1,14 +1,26 @@
+#[cfg(test)]
 use std::sync::Arc;
+#[cfg(test)]
 use std::collections::HashMap;
+#[cfg(test)]
 use tokio::sync::{mpsc, RwLock};
+#[cfg(test)]
 use tokio::time::{Duration, sleep};
+#[cfg(test)]
 use async_trait::async_trait;
+#[cfg(test)]
 use rand::Rng;
+#[cfg(test)]
+use chrono::Utc;
 
+#[cfg(test)]
 use crate::error::{HftError, VenueError};
+#[cfg(test)]
 use crate::types::{Order, Quote, OrderSide, OrderType};
+#[cfg(test)]
 use crate::venues::VenueAdapter;
 
+#[cfg(test)]
 pub struct MockVenueConfig {
     pub symbol_base_prices: HashMap<String, f64>,
     pub quote_interval_ms: u64,
@@ -17,6 +29,7 @@ pub struct MockVenueConfig {
     pub disconnect_probability: f64,
 }
 
+#[cfg(test)]
 impl Default for MockVenueConfig {
     fn default() -> Self {
         let mut symbol_base_prices = HashMap::new();
@@ -33,6 +46,7 @@ impl Default for MockVenueConfig {
     }
 }
 
+#[cfg(test)]
 pub struct MockVenue {
     name: String,
     config: MockVenueConfig,
@@ -42,6 +56,7 @@ pub struct MockVenue {
     order_responses: Arc<RwLock<HashMap<String, Result<String, HftError>>>>,
 }
 
+#[cfg(test)]
 impl MockVenue {
     pub fn new(name: &str, config: MockVenueConfig) -> Self {
         Self {
@@ -150,6 +165,7 @@ impl MockVenue {
     }
 }
 
+#[cfg(test)]
 impl Clone for MockVenueConfig {
     fn clone(&self) -> Self {
         Self {
@@ -162,6 +178,7 @@ impl Clone for MockVenueConfig {
     }
 }
 
+#[cfg(test)]
 #[async_trait]
 impl VenueAdapter for MockVenue {
     async fn name(&self) -> String {
@@ -224,7 +241,7 @@ impl VenueAdapter for MockVenue {
         // Generate mock order ID
         let order_id = format!("mock_order_{}_{}",
             order.symbol.to_lowercase(),
-            chrono::Utc::now().timestamp_millis()
+            Utc::now().timestamp_millis()
         );
 
         Ok(order_id)
