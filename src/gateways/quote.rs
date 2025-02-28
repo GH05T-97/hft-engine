@@ -1,14 +1,16 @@
 use std::sync::Arc;
 use std::collections::HashMap;
 use tokio::sync::{mpsc, RwLock};
+use tokio::time::Duration;
 use tracing::{info, warn, error, debug};
-use async_trait::async_trait;
 
 use crate::types::Quote;
 use crate::venues::VenueAdapter;
 use crate::error::{HftError, GatewayError};
 use crate::metrics::QUOTE_GATEWAY_THROUGHPUT;
 
+#[cfg(test)]
+use crate::mocks::mock_venue::{MockVenue, MockVenueConfig};
 pub struct QuoteGateway {
     pub(crate) venues: RwLock<Vec<Arc<dyn VenueAdapter>>>,
     pub(crate) quote_tx: mpsc::Sender<Quote>,
@@ -175,7 +177,14 @@ impl QuoteGateway {
     }
 }
 
-#[tokio::test]
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::Arc;
+    use tokio::sync::mpsc;
+    use tokio::time::Duration;
+    #[tokio::test]
 async fn test_quote_gateway_add_venue() {
     // Create channels
     let (quote_tx, _quote_rx) = mpsc::channel(100);
@@ -385,4 +394,5 @@ async fn test_quote_gateway_multiple_venues() {
     // Unsubscribe
     let result = gateway.unsubscribe_all().await;
     assert!(result.is_ok());
+}
 }

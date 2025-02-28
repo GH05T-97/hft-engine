@@ -5,10 +5,6 @@ use hft_engine::{
     command::CommandControl,
     venues::binance::BinanceVenue,
 };
-use warp::Filter;
-use prometheus::{gather, Encoder, TextEncoder};
-use hft_engine::metrics;
-use dotenv::dotenv;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

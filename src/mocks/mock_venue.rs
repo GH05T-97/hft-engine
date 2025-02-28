@@ -81,84 +81,89 @@ impl MockVenue {
         responses.insert(key, response);
     }
 
-    // Start generating mock quotes
-    async fn start_quote_generation(&self) -> Result<(), HftError> {
-        if self.quote_tx.is_none() {
-            return Err(VenueError::ConnectionFailed("Quote sender not configured".to_string()).into());
-        }
+#[cfg(test)]
+async fn start_quote_generation(&self) -> Result<(), HftError> {
+    if self.quote_tx.is_none() {
+        return Err(VenueError::ConnectionFailed("Quote sender not configured".to_string()).into());
+    }
 
-        let quote_tx = self.quote_tx.as_ref().unwrap().clone();
-        let subscribed_symbols = self.subscribed_symbols.clone();
-        let config = self.config.clone();
-        let venue_name = self.name.clone();
-        let is_running = self.is_running.clone();
+    let quote_tx = self.quote_tx.as_ref().unwrap().clone();
+    let subscribed_symbols = self.subscribed_symbols.clone();
+    let config = self.config.clone();
+    let venue_name = self.name.clone();
+    let is_running = self.is_running.clone();
 
-        *is_running.write().await = true;
+    *is_running.write().await = true;
 
-        tokio::spawn(async move {
+    tokio::spawn(async move {
+        // Create a new thread_rng in each iteration to avoid the Send issue
+
+        while *is_running.read().await {
+            // Create a new rng each time through the loop
             let mut rng = rand::thread_rng();
+            let symbols = subscribed_symbols.read().await.clone();
 
-            while *is_running.read().await {
-                let symbols = subscribed_symbols.read().await.clone();
-
-                for symbol in &symbols {
-                    // Simulate random connectivity issues
-                    if rng.gen::<f64>() < config.disconnect_probability {
-                        sleep(Duration::from_millis(500)).await;
-                        continue;
-                    }
-
-                    // Simulate random errors
-                    if rng.gen::<f64>() < config.error_probability {
-                        continue;
-                    }
-
-                    // Get base price for this symbol
-                    let base_price = *config.symbol_base_prices.get(symbol).unwrap_or(&100.0);
-
-                    // Generate random price movements (±0.5%)
-                    let price_movement = (rng.gen::<f64>() - 0.5) * 0.01 * base_price;
-                    let mid_price = base_price + price_movement;
-
-                    // Create spread around mid price
-                    let spread = mid_price * 0.0002; // 0.02% spread
-                    let bid = mid_price - spread / 2.0;
-                    let ask = mid_price + spread / 2.0;
-
-                    // Random sizes
-                    let bid_size = rng.gen_range(0.1..10.0);
-                    let ask_size = rng.gen_range(0.1..10.0);
-
-                    let quote = Quote {
-                        symbol: symbol.clone(),
-                        bid,
-                        ask,
-                        bid_size,
-                        ask_size,
-                        venue: venue_name.clone(),
-                        timestamp: std::time::SystemTime::now()
-                            .duration_since(std::time::UNIX_EPOCH)
-                            .unwrap()
-                            .as_millis() as u64,
-                    };
-
-                    // Simulate network latency
-                    sleep(Duration::from_millis(config.latency_ms)).await;
-
-                    // Send quote
-                    if let Err(e) = quote_tx.send(quote).await {
-                        eprintln!("Failed to send mock quote: {}", e);
-                        break;
-                    }
+            for symbol in &symbols {
+                // Simulate random connectivity issues
+                #[allow(deprecated)]
+                if rng.gen::<f64>() < config.disconnect_probability {
+                    sleep(Duration::from_millis(500)).await;
+                    continue;
                 }
 
-                // Wait before next update
-                sleep(Duration::from_millis(config.quote_interval_ms)).await;
-            }
-        });
+                // Simulate random errors
+                #[allow(deprecated)]
+                if rng.gen::<f64>() < config.error_probability {
+                    continue;
+                }
 
-        Ok(())
-    }
+                // Get base price for this symbol
+                let base_price = *config.symbol_base_prices.get(symbol).unwrap_or(&100.0);
+
+                // Generate random price movements (±0.5%)
+                let price_movement = (rng.gen::<f64>() - 0.5) * 0.01 * base_price;
+                let mid_price = base_price + price_movement;
+
+                // Create spread around mid price
+                let spread = mid_price * 0.0002; // 0.02% spread
+                let bid = mid_price - spread / 2.0;
+                let ask = mid_price + spread / 2.0;
+
+                // Random sizes
+                #[allow(deprecated)]
+                let bid_size = rng.gen_range(0.1..10.0);
+                let ask_size = rng.gen_range(0.1..10.0);
+
+                let quote = Quote {
+                    symbol: symbol.clone(),
+                    bid,
+                    ask,
+                    bid_size,
+                    ask_size,
+                    venue: venue_name.clone(),
+                    timestamp: std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap()
+                        .as_millis() as u64,
+                };
+
+                // Simulate network latency
+                sleep(Duration::from_millis(config.latency_ms)).await;
+
+                // Send quote
+                if let Err(e) = quote_tx.send(quote).await {
+                    eprintln!("Failed to send mock quote: {}", e);
+                    break;
+                }
+            }
+
+            // Wait before next update
+            sleep(Duration::from_millis(config.quote_interval_ms)).await;
+        }
+    });
+
+    Ok(())
+}
 
     pub async fn stop(&self) {
         *self.is_running.write().await = false;
@@ -205,6 +210,7 @@ impl VenueAdapter for MockVenue {
         Ok(())
     }
 
+    #[cfg(test)]
     async fn submit_order(&self, order: Order) -> Result<String, HftError> {
         // Simulate network latency
         sleep(Duration::from_millis(self.config.latency_ms)).await;
@@ -214,10 +220,12 @@ impl VenueAdapter for MockVenue {
         let responses = self.order_responses.read().await;
 
         if let Some(response) = responses.get(&key) {
+            // Clone response to avoid reference issues
             return response.clone();
         }
 
         // Default behavior
+        // Create RNG inside the function to avoid Send issues
         let mut rng = rand::thread_rng();
 
         // Validate order parameters
@@ -234,6 +242,7 @@ impl VenueAdapter for MockVenue {
         }
 
         // Random failure simulation
+        #[allow(deprecated)]
         if rng.gen::<f64>() < self.config.error_probability {
             return Err(VenueError::OrderSubmissionFailed("Random failure".to_string()).into());
         }
