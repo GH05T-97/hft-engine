@@ -21,6 +21,7 @@ use crate::types::{Order, Quote, OrderSide, OrderType};
 use crate::venues::VenueAdapter;
 
 #[cfg(test)]
+#[derive(Clone)]
 pub struct MockVenueConfig {
     pub symbol_base_prices: HashMap<String, f64>,
     pub quote_interval_ms: u64,
@@ -81,105 +82,148 @@ impl MockVenue {
         responses.insert(key, response);
     }
 
-#[cfg(test)]
-async fn start_quote_generation(&self) -> Result<(), HftError> {
-    if self.quote_tx.is_none() {
-        return Err(VenueError::ConnectionFailed("Quote sender not configured".to_string()).into());
+    // Helper function to generate and send a single quote
+    async fn generate_and_send_quote(
+        symbol: &str,
+        config: &MockVenueConfig,
+        venue_name: &str,
+        quote_tx: &mpsc::Sender<Quote>
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        // Create RNG inside this function (not carried across await points)
+        let mut rng = rand::thread_rng();
+
+        // Simulate random connectivity issues
+        if rng.gen::<f64>() < config.disconnect_probability {
+            sleep(Duration::from_millis(500)).await;
+            return Ok(());
+        }
+
+        // Simulate random errors
+        if rng.gen::<f64>() < config.error_probability {
+            return Ok(());
+        }
+
+        // Get base price for this symbol
+        let base_price = *config.symbol_base_prices.get(symbol).unwrap_or(&100.0);
+
+        // Generate random price movements (±0.5%)
+        let price_movement = (rng.gen::<f64>() - 0.5) * 0.01 * base_price;
+        let mid_price = base_price + price_movement;
+
+        // Create spread around mid price
+        let spread = mid_price * 0.0002; // 0.02% spread
+        let bid = mid_price - spread / 2.0;
+        let ask = mid_price + spread / 2.0;
+
+        // Random sizes
+        let bid_size = rng.gen_range(0.1..10.0);
+        let ask_size = rng.gen_range(0.1..10.0);
+
+        let quote = Quote {
+            symbol: symbol.to_string(),
+            bid,
+            ask,
+            bid_size,
+            ask_size,
+            venue: venue_name.to_string(),
+            timestamp: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_else(|_| std::time::Duration::from_secs(0))
+                .as_millis() as u64,
+        };
+
+        // Simulate network latency
+        sleep(Duration::from_millis(config.latency_ms)).await;
+
+        // Send quote
+        quote_tx.send(quote).await?;
+
+        Ok(())
     }
 
-    let quote_tx = self.quote_tx.as_ref().unwrap().clone();
-    let subscribed_symbols = self.subscribed_symbols.clone();
-    let config = self.config.clone();
-    let venue_name = self.name.clone();
-    let is_running = self.is_running.clone();
-
-    *is_running.write().await = true;
-
-    tokio::spawn(async move {
-        // Create a new thread_rng in each iteration to avoid the Send issue
-
-        while *is_running.read().await {
-            // Create a new rng each time through the loop
-            let mut rng = rand::thread_rng();
-            let symbols = subscribed_symbols.read().await.clone();
-
-            for symbol in &symbols {
-                // Simulate random connectivity issues
-                #[allow(deprecated)]
-                if rng.gen::<f64>() < config.disconnect_probability {
-                    sleep(Duration::from_millis(500)).await;
-                    continue;
-                }
-
-                // Simulate random errors
-                #[allow(deprecated)]
-                if rng.gen::<f64>() < config.error_probability {
-                    continue;
-                }
-
-                // Get base price for this symbol
-                let base_price = *config.symbol_base_prices.get(symbol).unwrap_or(&100.0);
-
-                // Generate random price movements (±0.5%)
-                let price_movement = (rng.gen::<f64>() - 0.5) * 0.01 * base_price;
-                let mid_price = base_price + price_movement;
-
-                // Create spread around mid price
-                let spread = mid_price * 0.0002; // 0.02% spread
-                let bid = mid_price - spread / 2.0;
-                let ask = mid_price + spread / 2.0;
-
-                // Random sizes
-                #[allow(deprecated)]
-                let bid_size = rng.gen_range(0.1..10.0);
-                let ask_size = rng.gen_range(0.1..10.0);
-
-                let quote = Quote {
-                    symbol: symbol.clone(),
-                    bid,
-                    ask,
-                    bid_size,
-                    ask_size,
-                    venue: venue_name.clone(),
-                    timestamp: std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .unwrap()
-                        .as_millis() as u64,
-                };
-
-                // Simulate network latency
-                sleep(Duration::from_millis(config.latency_ms)).await;
-
-                // Send quote
-                if let Err(e) = quote_tx.send(quote).await {
-                    eprintln!("Failed to send mock quote: {}", e);
-                    break;
-                }
-            }
-
-            // Wait before next update
-            sleep(Duration::from_millis(config.quote_interval_ms)).await;
+    #[cfg(test)]
+    async fn start_quote_generation(&self) -> Result<(), HftError> {
+        if self.quote_tx.is_none() {
+            return Err(VenueError::ConnectionFailed("Quote sender not configured".to_string()).into());
         }
-    });
 
-    Ok(())
-}
+        let quote_tx = self.quote_tx.as_ref().unwrap().clone();
+        let subscribed_symbols = self.subscribed_symbols.clone();
+        let config = self.config.clone();
+        let venue_name = self.name.clone();
+        let is_running = self.is_running.clone();
+
+        *is_running.write().await = true;
+
+        // Use a separate thread for randomness to avoid Send issues with ThreadRng
+        tokio::task::spawn_blocking(move || {
+            // This runs on a dedicated thread where we can safely use thread-local random
+            let runtime = tokio::runtime::Handle::current();
+
+            while runtime.block_on(is_running.read()).deref().clone() {
+                // Get symbols
+                let symbols = runtime.block_on(subscribed_symbols.read()).clone();
+
+                // Process each symbol
+                for symbol in &symbols {
+                    // Use thread-local RNG safely since we're in a dedicated thread
+                    let mut rng = rand::thread_rng();
+
+                    // Skip if disconnected
+                    if rng.gen::<f64>() < config.disconnect_probability {
+                        std::thread::sleep(std::time::Duration::from_millis(500));
+                        continue;
+                    }
+
+                    // Skip if error
+                    if rng.gen::<f64>() < config.error_probability {
+                        continue;
+                    }
+
+                    // Generate quote data using RNG
+                    let base_price = *config.symbol_base_prices.get(symbol).unwrap_or(&100.0);
+                    let price_movement = (rng.gen::<f64>() - 0.5) * 0.01 * base_price;
+                    let mid_price = base_price + price_movement;
+                    let spread = mid_price * 0.0002;
+                    let bid = mid_price - spread / 2.0;
+                    let ask = mid_price + spread / 2.0;
+                    let bid_size = rng.gen_range(0.1..10.0);
+                    let ask_size = rng.gen_range(0.1..10.0);
+
+                    let quote = Quote {
+                        symbol: symbol.clone(),
+                        bid,
+                        ask,
+                        bid_size,
+                        ask_size,
+                        venue: venue_name.clone(),
+                        timestamp: std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap_or_else(|_| std::time::Duration::from_secs(0))
+                            .as_millis() as u64,
+                    };
+
+                    // Sleep for simulated latency
+                    std::thread::sleep(std::time::Duration::from_millis(config.latency_ms));
+
+                    // Send the quote
+                    runtime.block_on(async {
+                        if let Err(e) = quote_tx.send(quote).await {
+                            eprintln!("Failed to send mock quote: {}", e);
+                        }
+                    });
+                }
+
+                // Wait before next update
+                std::thread::sleep(std::time::Duration::from_millis(config.quote_interval_ms));
+            }
+        });
+
+        Ok(())
+    }
 
     pub async fn stop(&self) {
         *self.is_running.write().await = false;
-    }
-}
-
-#[cfg(test)]
-impl Clone for MockVenueConfig {
-    fn clone(&self) -> Self {
-        Self {
-            symbol_base_prices: self.symbol_base_prices.clone(),
-            quote_interval_ms: self.quote_interval_ms,
-            latency_ms: self.latency_ms,
-            error_probability: self.error_probability,
-            disconnect_probability: self.disconnect_probability,
-        }
     }
 }
 
@@ -210,9 +254,8 @@ impl VenueAdapter for MockVenue {
         Ok(())
     }
 
-    #[cfg(test)]
     async fn submit_order(&self, order: Order) -> Result<String, HftError> {
-        // Simulate network latency
+        // Simulate network latency first
         sleep(Duration::from_millis(self.config.latency_ms)).await;
 
         // Check for configured response
@@ -223,10 +266,7 @@ impl VenueAdapter for MockVenue {
             // Clone response to avoid reference issues
             return response.clone();
         }
-
-        // Default behavior
-        // Create RNG inside the function to avoid Send issues
-        let mut rng = rand::thread_rng();
+        drop(responses); // Explicitly drop the lock
 
         // Validate order parameters
         if order.quantity <= 0.0 {
@@ -241,17 +281,21 @@ impl VenueAdapter for MockVenue {
             ).into());
         }
 
-        // Random failure simulation
-        #[allow(deprecated)]
-        if rng.gen::<f64>() < self.config.error_probability {
+        // Create RNG and check for random failure immediately before returning success
+        // This ensures the RNG doesn't cross an await boundary
+        let should_fail;
+        {
+            let mut rng = rand::thread_rng();
+            should_fail = rng.gen::<f64>() < self.config.error_probability;
+        }
+
+        if should_fail {
             return Err(VenueError::OrderSubmissionFailed("Random failure".to_string()).into());
         }
 
         // Generate mock order ID
-        let order_id = format!("mock_order_{}_{}",
-            order.symbol.to_lowercase(),
-            Utc::now().timestamp_millis()
-        );
+        let timestamp = Utc::now().timestamp_millis();
+        let order_id = format!("mock_order_{}_{}", order.symbol.to_lowercase(), timestamp);
 
         Ok(order_id)
     }
