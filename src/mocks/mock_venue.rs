@@ -313,6 +313,11 @@ impl VenueAdapter for MockVenue {
 
         Ok(order_id)
     }
+
+    async fn stop(&self) -> Result<(), HftError> {
+        self.stop().await;
+        Ok(())
+    }
 }
 
 #[cfg(test)]

@@ -15,4 +15,10 @@ pub trait VenueAdapter: Send + Sync {
 
     /// Submit an order to the venue
     async fn submit_order(&self, order: Order) -> Result<String, HftError>;
+    
+    /// Stop any background tasks or connections
+    async fn stop(&self) -> Result<(), HftError> {
+        // Default implementation does nothing
+        Ok(())
+    }
 }

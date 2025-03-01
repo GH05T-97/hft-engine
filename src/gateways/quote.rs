@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::any::Any;
 use std::collections::HashMap;
 use tokio::sync::{mpsc, RwLock};
 use tokio::time::Duration;
@@ -86,13 +87,9 @@ impl QuoteGateway {
         // Update the venues with our filtered list
         *venues = new_venues;
 
-        // Stop the removed venue if it's a MockVenue
+        // Stop the removed venue if we found one
         if let Some(venue) = removed_venue {
-            // Use dynamic casting if possible, or another way to detect MockVenue
-            #[cfg(test)]
-            if let Some(mock_venue) = (venue as Any).downcast_ref::<MockVenue>() {
-                mock_venue.stop().await;
-            }
+            venue.stop().await?;
         }
 
         Ok(())
