@@ -155,40 +155,56 @@ impl MockVenue {
 
         *is_running.write().await = true;
 
-        // Use a separate thread for randomness to avoid Send issues with ThreadRng
-        tokio::task::spawn_blocking(move || {
-            // This runs on a dedicated thread where we can safely use thread-local random
-            let runtime = tokio::runtime::Handle::current();
+        // Completely avoid using random number generation in the async task
+        // by precomputing all the necessary values in a separate task
+        tokio::spawn(async move {
+            use std::sync::Arc;
+            use tokio::sync::Mutex;
 
-            while runtime.block_on(is_running.read()).deref().clone() {
-                // Get symbols
-                let symbols = runtime.block_on(subscribed_symbols.read()).clone();
+            while *is_running.read().await {
+                // Read symbols
+                let symbols = subscribed_symbols.read().await.clone();
 
-                // Process each symbol
+                // Process each symbol independently
                 for symbol in &symbols {
-                    // Use thread-local RNG safely since we're in a dedicated thread
-                    let mut rng = rand::thread_rng();
+                    // Generate all random values in a sync context before we send them to async
+                    // This approach allows us to use ThreadRng safely
+                    let should_skip_disconnect;
+                    let should_skip_error;
+                    let price_movement;
+                    let bid_size;
+                    let ask_size;
 
-                    // Skip if disconnected
-                    if rng.gen::<f64>() < config.disconnect_probability {
-                        std::thread::sleep(std::time::Duration::from_millis(500));
+                    {
+                        // Create a new rng just for this scope
+                        // It won't cross any await points
+                        let mut rng = rand::thread_rng();
+
+                        should_skip_disconnect = rng.gen::<f64>() < config.disconnect_probability;
+                        should_skip_error = rng.gen::<f64>() < config.error_probability;
+                        price_movement = (rng.gen::<f64>() - 0.5) * 0.01;
+                        bid_size = rng.gen_range(0.1..10.0);
+                        ask_size = rng.gen_range(0.1..10.0);
+                    }
+
+                    // Now we can use the precomputed random values in the async context
+                    if should_skip_disconnect {
+                        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
                         continue;
                     }
 
-                    // Skip if error
-                    if rng.gen::<f64>() < config.error_probability {
+                    if should_skip_error {
                         continue;
                     }
 
-                    // Generate quote data using RNG
+                    // Get base price for this symbol
                     let base_price = *config.symbol_base_prices.get(symbol).unwrap_or(&100.0);
-                    let price_movement = (rng.gen::<f64>() - 0.5) * 0.01 * base_price;
-                    let mid_price = base_price + price_movement;
-                    let spread = mid_price * 0.0002;
+                    let mid_price = base_price + (price_movement * base_price);
+
+                    // Create spread around mid price
+                    let spread = mid_price * 0.0002; // 0.02% spread
                     let bid = mid_price - spread / 2.0;
                     let ask = mid_price + spread / 2.0;
-                    let bid_size = rng.gen_range(0.1..10.0);
-                    let ask_size = rng.gen_range(0.1..10.0);
 
                     let quote = Quote {
                         symbol: symbol.clone(),
@@ -203,19 +219,18 @@ impl MockVenue {
                             .as_millis() as u64,
                     };
 
-                    // Sleep for simulated latency
-                    std::thread::sleep(std::time::Duration::from_millis(config.latency_ms));
+                    // Simulate network latency
+                    tokio::time::sleep(tokio::time::Duration::from_millis(config.latency_ms)).await;
 
-                    // Send the quote
-                    runtime.block_on(async {
-                        if let Err(e) = quote_tx.send(quote).await {
-                            eprintln!("Failed to send mock quote: {}", e);
-                        }
-                    });
+                    // Send quote
+                    if let Err(e) = quote_tx.send(quote).await {
+                        eprintln!("Failed to send mock quote: {}", e);
+                        break;
+                    }
                 }
 
                 // Wait before next update
-                std::thread::sleep(std::time::Duration::from_millis(config.quote_interval_ms));
+                tokio::time::sleep(tokio::time::Duration::from_millis(config.quote_interval_ms)).await;
             }
         });
 
@@ -254,9 +269,10 @@ impl VenueAdapter for MockVenue {
         Ok(())
     }
 
+    #[cfg(test)]
     async fn submit_order(&self, order: Order) -> Result<String, HftError> {
         // Simulate network latency first
-        sleep(Duration::from_millis(self.config.latency_ms)).await;
+        tokio::time::sleep(tokio::time::Duration::from_millis(self.config.latency_ms)).await;
 
         // Check for configured response
         let key = format!("{}:{:?}", order.symbol, order.side);
@@ -281,13 +297,11 @@ impl VenueAdapter for MockVenue {
             ).into());
         }
 
-        // Create RNG and check for random failure immediately before returning success
-        // This ensures the RNG doesn't cross an await boundary
-        let should_fail;
-        {
+        // Compute random value before any other await points
+        let should_fail = {
             let mut rng = rand::thread_rng();
-            should_fail = rng.gen::<f64>() < self.config.error_probability;
-        }
+            rng.gen::<f64>() < self.config.error_probability
+        };
 
         if should_fail {
             return Err(VenueError::OrderSubmissionFailed("Random failure".to_string()).into());

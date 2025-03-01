@@ -55,7 +55,6 @@ impl QuoteGateway {
         }
     }
 
-    /// Remove a venue from the quote gateway
     pub async fn remove_venue(&self, venue_name: &str) -> Result<(), HftError> {
         debug!(venue = %venue_name, "Removing venue from quote gateway");
 
@@ -64,11 +63,14 @@ impl QuoteGateway {
 
         // Create a new vector to hold venues we want to keep
         let mut new_venues = Vec::new();
+        let mut removed_venue = None;
 
         // Check each venue and only keep those with a different name
         for venue in venues.drain(..) {
             if venue.name().await != venue_name {
                 new_venues.push(venue);
+            } else {
+                removed_venue = Some(venue);
             }
         }
 
@@ -83,6 +85,15 @@ impl QuoteGateway {
 
         // Update the venues with our filtered list
         *venues = new_venues;
+
+        // Stop the removed venue if it's a MockVenue
+        if let Some(venue) = removed_venue {
+            // Use dynamic casting if possible, or another way to detect MockVenue
+            #[cfg(test)]
+            if let Some(mock_venue) = (venue as Any).downcast_ref::<MockVenue>() {
+                mock_venue.stop().await;
+            }
+        }
 
         Ok(())
     }
@@ -222,6 +233,11 @@ async fn test_quote_gateway_remove_venue() {
     // Check that venues were added
     let venues = gateway.venues.read().await;
     assert_eq!(venues.len(), 2);
+    drop(venues);  // Explicitly drop the lock
+
+    // Stop venues explicitly for test cleanup
+    venue1.stop().await;
+    venue2.stop().await;
 
     // Remove one venue
     let result = gateway.remove_venue("MOCK1").await;
@@ -230,6 +246,7 @@ async fn test_quote_gateway_remove_venue() {
     // Check that venue was removed
     let venues = gateway.venues.read().await;
     assert_eq!(venues.len(), 1);
+    drop(venues);  // Explicitly drop the lock
 
     // Try to remove a venue that doesn't exist
     let result = gateway.remove_venue("NONEXISTENT").await;
